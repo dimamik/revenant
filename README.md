@@ -143,6 +143,24 @@ To remove an entity entirely - stop its process and drop its row - use
 * `[:revenant, :load]` - a process revived from a committed snapshot (not
   first-ever starts); metadata `%{module, id, version}`
 
+## Planned
+
+* **Group commit.** Under `:strict`, per-entity throughput is capped by
+  commit latency because every call is its own `UPDATE`. When calls queue
+  up on one entity, the server will drain its mailbox, apply the handlers,
+  commit **once** - one snapshot covers all of them - and only then reply
+  to every caller. The guarantee is unchanged (no caller is acked before
+  its state is durable), but throughput under contention scales with batch
+  size instead of write latency.
+
+* **Postgres-arbitrated ownership.** Today the registry is node-local and
+  multi-node routing is your job. Since Postgres is already the source of
+  truth, it can also arbitrate ownership: a lease claimed on activation,
+  renewed by heartbeat, stolen when expired. A node that loses its lease
+  passivates the entity instead of racing it. Multi-node clusters would
+  then work without consistent hashing or a fronting queue, with the
+  version column demoted to a backstop instead of the primary defense.
+
 ## When not to use this
 
 If `init/1` could rebuild your state from tables you already have, you do
